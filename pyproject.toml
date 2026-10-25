@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "piratenets"
+version = "0.1.0"
+description = "Independent PyTorch reimplementation of PirateNets and the Expert's Guide PINN training pipeline"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Maan Pandya" }]
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["piratenets*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

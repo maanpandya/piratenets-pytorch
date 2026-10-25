@@ -1,0 +1,26 @@
+# Papers are copyrighted: keep local, never commit
+papers/
+
+# Training artifacts
+checkpoints/
+runs/
+outputs/
+*.pt
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local Claude Code overrides
+.claude/settings.local.json
+CLAUDE.local.md
+CLAUDE.md
+
+# OS
+.DS_Store
