@@ -1,0 +1,54 @@
+# Expert's Guide (arXiv:2308.08468), Allen-Cahn ablation, Table 2 row 2 (no Fourier features):
+# RWF + grad-norm weighting + causal weighting, Fourier features OFF.
+# Paper: rel. L2 = 4.35e-1, 13.20 min. Settings: Sec. 7 (shared ablation
+# hyper-parameters) and Algorithm 1 defaults. Values the paper does not state
+# come from jaxpi (its example configs, or its code for design decisions) or are
+# our own choices; "D<n>" points to docs/decisions.md.
+name: ablation_no_fourier
+device: auto
+problem:
+  name: allen_cahn
+  reference: data/allen_cahn_ref.npz
+model:
+  arch: mlp                 # Sec. 7: MLP backbone, 4 hidden layers x 256, tanh, Glorot
+  hidden_dim: 256
+  num_layers: 4
+  activation: tanh
+  periodic: true            # Sec. 6.3 / Sec. 7: exact periodic BCs in every experiment
+  fourier:
+    enabled: false
+    scale: 1.0              # jaxpi config (D3)
+    embed_dim: 256          # jaxpi config (D4)
+    trainable: true         # jaxpi (D5)
+  rwf:
+    enabled: true
+    mu: 0.5                 # jaxpi config (D6)
+    sigma: 0.1
+optim:
+  lr: 1.0e-3                # Sec. 7
+  decay_rate: 0.9           # Sec. 7
+  decay_steps: 2000         # Sec. 7
+  staircase: false          # jaxpi (D9)
+  warmup_steps: 0           # jaxpi (D9)
+training:
+  steps: 200000             # jaxpi config (D2)
+  batch_size: 4096          # Sec. 7
+  ic_sampling: grid         # jaxpi (D11): fixed reference x-grid
+  n_ic: 4096                # only used with ic_sampling: random
+  seed: 0
+  derivatives: func
+weighting:
+  scheme: grad_norm         # Algorithm 1, eqs. 2.12-2.15
+  update_every: 1000        # Algorithm 1: f = 1,000
+  momentum: 0.9             # Algorithm 1: alpha = 0.9
+  grad_norm_reduction: mean # jaxpi (D20); "sum" is eqs. 2.12-2.14 as printed
+causal:
+  enabled: true
+  tol: 1.0                  # Algorithm 1: epsilon = 1.0
+  num_chunks: 32            # jaxpi config (D12)
+logging:
+  out_dir: runs/allen_cahn/ablation/{name}
+  checkpoint_dir: ""
+  log_every: 100
+  eval_every: 1000
+  checkpoint_every: 5000
