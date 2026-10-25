@@ -54,7 +54,8 @@ Any config value can be overridden from the command line, for example
 `--set training.steps=2000 causal.num_chunks=16`.
 
 To run on a Colab GPU, with checkpoints and logs saved to Google Drive, use
-[`notebooks/colab_ablation.ipynb`](notebooks/colab_ablation.ipynb).
+[`notebooks/colab_ablation.ipynb`](notebooks/colab_ablation.ipynb)
+([open in Colab](https://colab.research.google.com/github/maanpandya/piratenets-pytorch/blob/main/notebooks/colab_ablation.ipynb)).
 
 ## Layout
 
