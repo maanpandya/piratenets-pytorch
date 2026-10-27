@@ -49,7 +49,7 @@ def main():
         max_step = max(max_step, steps[-1])
         ax.semilogy(steps, errs, color=color, label=label)
         summary = run / "summary.json"
-        done = summary.exists() and json.loads(summary.read_text()).get("finished")
+        done = summary.exists() and json.loads(summary.read_text(encoding="utf-8")).get("finished")
         final, wall = errs[-1], m["wall_time"][-1][1] / 60
         status = f"{steps[-1]}" + ("" if done else " (running)")
         table.append(
@@ -68,7 +68,7 @@ def main():
     fig.savefig(root / "ablation_rel_l2.png")
 
     text = "\n".join(table) + "\n"
-    (root / "ablation_table.md").write_text(text)
+    (root / "ablation_table.md").write_text(text, encoding="utf-8")
     print(text)
     print(f"wrote {root / 'ablation_rel_l2.png'} and {root / 'ablation_table.md'}")
 

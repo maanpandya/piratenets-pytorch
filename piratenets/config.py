@@ -183,11 +183,11 @@ def apply_overrides(data: dict, overrides) -> dict:
 
 
 def load_config(path, overrides=None) -> Config:
-    with open(resolve_path(str(path))) as f:
+    with open(resolve_path(str(path)), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return config_from_dict(apply_overrides(data, overrides))
 
 
 def save_config(cfg: Config, path) -> None:
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(config_to_dict(cfg), f, sort_keys=False)

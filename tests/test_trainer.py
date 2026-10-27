@@ -62,7 +62,7 @@ def test_finished_run_writes_outputs(tiny_cfg):
     out = tiny_cfg.out_dir
     assert summary["finished"] and summary["step"] == 10
     assert (out / "prediction.npz").exists() and (out / "config.yaml").exists()
-    assert json.loads((out / "summary.json").read_text())["rel_l2"] == pytest.approx(summary["rel_l2"])
+    assert json.loads((out / "summary.json").read_text(encoding="utf-8"))["rel_l2"] == pytest.approx(summary["rel_l2"])
     rows = _rows(out / "metrics.csv")
     assert rows[0]["rel_l2"] and rows[-1]["step"] == "10" and rows[-1]["rel_l2"]
     assert rows[0]["grad_norm_ic"] and rows[3]["grad_norm_ic"] and not rows[1]["grad_norm_ic"]

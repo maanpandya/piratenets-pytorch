@@ -69,15 +69,15 @@ class CSVLogger:
         self.path = path
         rows = []
         if path.exists() and keep_below_step > 0:
-            with open(path, newline="") as f:
+            with open(path, newline="", encoding="utf-8") as f:
                 rows = [r for r in csv.DictReader(f) if int(r["step"]) < keep_below_step]
-        with open(path, "w", newline="") as f:
+        with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
             writer.writeheader()
             writer.writerows(rows)
 
     def write(self, row: dict) -> None:
-        with open(self.path, "a", newline="") as f:
+        with open(self.path, "a", newline="", encoding="utf-8") as f:
             csv.DictWriter(f, fieldnames=CSV_FIELDS).writerow({k: row.get(k, "") for k in CSV_FIELDS})
 
 
@@ -285,7 +285,7 @@ class Trainer:
             "gpu": torch.cuda.get_device_name(self.device) if self.device.type == "cuda" else None,
             "torch": torch.__version__,
         }
-        with open(cfg.out_dir / "summary.json", "w") as f:
+        with open(cfg.out_dir / "summary.json", "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
         print(f"[{cfg.name}] done: rel_l2 {rel_l2:.3e} after {self.step} steps, {self.elapsed / 60:.1f} min", flush=True)
         return summary

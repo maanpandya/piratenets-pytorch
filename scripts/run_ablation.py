@@ -24,7 +24,7 @@ def is_finished(out_dir: Path, steps: int) -> bool:
     summary = out_dir / "summary.json"
     if not summary.exists():
         return False
-    s = json.loads(summary.read_text())
+    s = json.loads(summary.read_text(encoding="utf-8"))
     return bool(s.get("finished")) and s.get("step") == steps
 
 
@@ -43,7 +43,7 @@ def main():
         cfg.logging.out_dir = str(out_root / cfg.name)
         if is_finished(cfg.out_dir, cfg.training.steps):
             print(f"[{cfg.name}] already finished, skipping", flush=True)
-            results[row] = json.loads((cfg.out_dir / "summary.json").read_text())["rel_l2"]
+            results[row] = json.loads((cfg.out_dir / "summary.json").read_text(encoding="utf-8"))["rel_l2"]
             continue
         trainer = Trainer(cfg)
         results[row] = trainer.train(resume=True)["rel_l2"]

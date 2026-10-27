@@ -35,7 +35,7 @@ def apply_style():
 def read_metrics(path):
     """metrics.csv -> {column: list of (step, value)} with empty cells skipped."""
     series = {}
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             step = int(row["step"])
             for key, value in row.items():
