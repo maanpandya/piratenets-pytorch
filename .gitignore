@@ -20,7 +20,6 @@ venv/
 # Local Claude Code overrides
 .claude/settings.local.json
 CLAUDE.local.md
-CLAUDE.md
 
 # OS
 .DS_Store

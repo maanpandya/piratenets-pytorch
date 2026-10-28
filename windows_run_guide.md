@@ -12,7 +12,7 @@ Report to the user at the checkpoints marked **Report**. The run takes hours; yo
 
 ## Rules
 
-This clone has no `CLAUDE.md` (it is gitignored), so these rules replace it.
+These rules apply on top of `CLAUDE.md`. See also `handoff.md` for the project's status.
 
 1. **Don't change the experiment.** Do not edit configs, hyperparameters, numerics or the precision settings. TF32 must stay off; `piratenets/trainer.py` turns it off.
    - The only override you may add to the ablation command is `training.derivatives=autograd`, and only under the rule in step 6.
