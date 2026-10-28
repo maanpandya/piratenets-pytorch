@@ -1,7 +1,11 @@
 # Windows run guide: Allen–Cahn ablation on the local GPU
 
+**Status: completed on the laptop.** Keep this as the reference for re-doing the setup
+and for the launch and resume commands (step 7). For the current state and next steps,
+see `handoff.md`.
+
 **For the Claude Code session on the Windows laptop (RTX 3070 Ti Laptop GPU).**
-Your job is to:
+The setup steps were:
 1. set up this repo;
 2. check that it runs correctly on the GPU;
 3. measure its speed;
@@ -17,7 +21,7 @@ These rules apply on top of `CLAUDE.md`. See also `handoff.md` for the project's
 1. **Don't change the experiment.** Do not edit configs, hyperparameters, numerics or the precision settings. TF32 must stay off; `piratenets/trainer.py` turns it off.
    - The only override you may add to the ablation command is `training.derivatives=autograd`, and only under the rule in step 6.
 2. **Fix only platform problems.** If something fails because of Windows, make the smallest platform-only fix and show the user the diff. Then re-run the tests.
-3. **Never commit or push.** The user brings any changes back to the main session.
+3. **Commit or push only when the user asks.**
 4. **Don't use jaxpi code.** This repo is an independent, MIT-licensed reimplementation. Never copy code from `PredictiveIntelligenceLab/jaxpi` or any port of it. You don't need to look at it for this task.
 5. **Keep test runs separate.** Smoke and benchmark runs write only to `runs/smoke/` (or a temp dir), never to `runs/allen_cahn/ablation/`.
 6. **Never delete `runs/allen_cahn/ablation/`.** Its checkpoints are what make a resume possible.
@@ -137,7 +141,7 @@ Rows run in this order: `default`, `no_fourier`, `no_rwf`, `no_grad_norm`, `no_c
 
 **Report when `ablation_default` finishes.** `summary.json` appears and the log shows `[ablation_default] done: rel_l2 ...`.
 - Give its final relative L2 error next to the paper's 5.84e-4.
-- If it is more than about 10× worse (above ~6e-3), say so plainly. The user may want to stop and send `metrics.csv` to the main session before spending hours on the other rows. That is their call; the run continues otherwise.
+- If it is more than about 10× worse (above ~6e-3), say so plainly. The user may want to stop and debug before spending hours on the other rows (see `handoff.md`). That is their call; the run continues otherwise.
 
 **If the run is interrupted** (crash, reboot, sleep), launch the same command again:
 - Finished rows are skipped.
@@ -161,7 +165,7 @@ This writes `ablation_results.zip` in the repo root, a few MB without checkpoint
 - the wall time per row;
 - anything unusual in the logs;
 - any code changes you made, as a diff;
-- the path of the zip, so the user can bring it to the main session.
+- the path of the zip, if the user wants to share the results.
 
 Paper values for comparison (Expert's Guide Table 2, relative L2):
 
