@@ -1,12 +1,13 @@
 import csv
 import json
 import math
+import sys
 
 import pytest
 import torch
 
 from piratenets.config import OptimConfig
-from piratenets.trainer import Trainer, lr_factor
+from piratenets.trainer import Trainer, disable_power_throttling, lr_factor
 
 
 def _rows(path):
@@ -71,6 +72,10 @@ def test_finished_run_writes_outputs(tiny_cfg):
     rows = _rows(out / "metrics.csv")
     assert rows[0]["rel_l2"] and rows[-1]["step"] == "10" and rows[-1]["rel_l2"]
     assert rows[0]["grad_norm_ic"] and rows[3]["grad_norm_ic"] and not rows[1]["grad_norm_ic"]
+
+
+def test_power_throttling_opt_out_applies_only_on_windows():
+    assert disable_power_throttling() == (sys.platform == "win32")
 
 
 def test_resume_rejects_a_different_config(tiny_cfg):

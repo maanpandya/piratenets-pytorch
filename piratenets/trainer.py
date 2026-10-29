@@ -6,10 +6,12 @@ loss weights. Logs to <out_dir>/metrics.csv, checkpoints to
 <checkpoint_dir>/last.pt, and resumes from there exactly.
 """
 import csv
+import ctypes
 import json
 import math
 import os
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -42,6 +44,29 @@ def set_precision() -> None:
     torch.set_float32_matmul_precision("highest")
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
+
+
+def disable_power_throttling() -> bool:
+    """Opt this process out of Windows' execution-speed power throttling (EcoQoS).
+
+    Windows 11 throttles a minimized background process, e.g. once the display turns off,
+    by moving it to efficiency cores at low clocks. Training is bound by how fast the CPU
+    launches GPU kernels, so that more than halves its speed. Does nothing elsewhere.
+    """
+    if sys.platform != "win32":
+        return False
+    from ctypes import wintypes
+
+    class State(ctypes.Structure):  # PROCESS_POWER_THROTTLING_STATE
+        _fields_ = [("version", wintypes.ULONG), ("control_mask", wintypes.ULONG), ("state_mask", wintypes.ULONG)]
+
+    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.SetProcessInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel32.SetProcessInformation.restype = wintypes.BOOL
+    # version 1; control the EXECUTION_SPEED bit and set it off; class 4 is ProcessPowerThrottling
+    state = State(1, 1, 0)
+    return bool(kernel32.SetProcessInformation(kernel32.GetCurrentProcess(), 4, ctypes.byref(state), ctypes.sizeof(state)))
 
 
 def resolve_device(name: str) -> torch.device:
@@ -84,6 +109,7 @@ class CSVLogger:
 class Trainer:
     def __init__(self, cfg):
         set_precision()
+        disable_power_throttling()
         self.cfg = cfg
         self.device = resolve_device(cfg.device)
         seed = cfg.training.seed
