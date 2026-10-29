@@ -70,12 +70,12 @@ Check that PyTorch sees the GPU:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
-- **Expected:** `41 passed`.
+- **Expected:** `43 passed` (on a machine without CUDA, one test is skipped).
 - **If any test fails:** stop and report the output. Don't change test tolerances.
 
 ## 4. GPU smoke test and resume check
 
-This is the code's first run on CUDA; so far it has only run on CPU. Run 200 steps, stop, then resume to step 400:
+This checks the GPU path and resume on CUDA (the first run here found and fixed a CUDA-only resume bug). Run 200 steps, stop, then resume to step 400:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train.py --config configs\allen_cahn\ablation\default.yaml --out-dir runs\smoke --no-resume --max-steps 200 --set training.steps=400 logging.eval_every=100
@@ -183,5 +183,7 @@ Paper values for comparison (Expert's Guide Table 2, relative L2):
 - **`torch.cuda.is_available()` is False:** the CPU wheel is installed, or the driver is too old for the chosen CUDA wheel. Reinstall torch from a CUDA index no newer than `nvidia-smi`'s CUDA version.
 - **`PermissionError` when replacing `last.pt`:** OneDrive or antivirus is holding the file. Move the repo out of OneDrive, or exclude the folder from scanning.
 - **CUDA out of memory:** this is not expected, since a run should need well under 2 GB. Close other GPU applications and report it.
-- **The run gets slower over time:** the elapsed time per 1,000 steps in the log creeps up. This is likely thermal throttling. It's harmless to the results, but tell the user.
+- **The run gets slower over time:** the elapsed time per 1,000 steps in the log creeps up. This is harmless to the results, but tell the user.
+  - If GPU-Util in `nvidia-smi` stays high, it is likely thermal throttling.
+  - If GPU-Util drops (to ~30%) while one CPU core is busy, Windows is throttling the background process (EcoQoS), typically once the display turns off. `Trainer` opts its process out of this at startup (`disable_power_throttling` in `piratenets/trainer.py`); before that was added, it slowed the first ablation's `default` row from 12 to 30–34 s per 1,000 steps.
 - **`ModuleNotFoundError: piratenets`:** you are not using `PY`, or `pip install -e ".[dev]"` didn't run in the venv.
