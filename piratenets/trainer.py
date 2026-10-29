@@ -192,13 +192,14 @@ class Trainer:
         self.optimizer.load_state_dict(state["optimizer"])
         self.scheduler.load_state_dict(state["scheduler"])
         self.weighting.load_state_dict(state["weighting"])
+        # RNG states must be CPU ByteTensors, but torch.load's map_location moves them to the device.
         rng = state["rng"]
         random.setstate(rng["python"])
         np.random.set_state(rng["numpy"])
-        torch.set_rng_state(rng["torch"])
-        self.generator.set_state(rng["sampler"])
+        torch.set_rng_state(rng["torch"].cpu())
+        self.generator.set_state(rng["sampler"].cpu())
         if "cuda" in rng and torch.cuda.is_available():
-            torch.cuda.set_rng_state_all(rng["cuda"])
+            torch.cuda.set_rng_state_all([s.cpu() for s in rng["cuda"]])
         self.step = state["step"]
         self.elapsed = state["elapsed"]
 

@@ -27,7 +27,12 @@ def test_lr_schedule():
     assert f(0) == 0.0 and f(2500) == 0.5 and f(5000) == 1.0 and math.isclose(f(10000), 0.9)
 
 
-def test_resume_reproduces_uninterrupted_run_exactly(tiny_cfg, tmp_path):
+@pytest.mark.parametrize("device", [
+    "cpu",
+    pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")),
+])
+def test_resume_reproduces_uninterrupted_run_exactly(tiny_cfg, tmp_path, device):
+    tiny_cfg.device = device
     # uninterrupted run
     ref = Trainer(tiny_cfg)
     ref.train(resume=False)
