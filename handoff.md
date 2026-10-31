@@ -151,6 +151,7 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
 - **TF32 is not the cause.** At JAX's default precision, seed 42 follows the paper's curve as closely as at full precision, and ends 25% higher (7.31e-4). This does not show which precision the paper used.
 - **Our trainer from jaxpi's seed-42 network ends at 3.44e-4**, below both jaxpi's 5.52e-4 and the paper's 5.84e-4, though it draws its own batches. Its error was 0.50 at 10k, 8.7e-3 at 40k and 6.5e-4 at 100k.
   - So our training loop is not the gap. The starting network largely decides the outcome.
+  - From jaxpi's seed-0 network, ours ends at 2.27e-3, against jaxpi's 1.51e-3. So for the same start the two trainers differ by up to 1.5× in either direction (ours 0.62× jaxpi's at seed 42, 1.50× at seed 0), from batches and round-off alone.
   - The open question is whether jaxpi's initial networks are better than ours on average, or our seeds were unlucky. Their statistics match: the per-layer weights above, and the spread of the initial output u(t, x).
 - **Running:**
   - our trainer from jaxpi's initial networks for seeds 0–5 (`runs\from_jaxpi_init.ps1` and `runs\from_jaxpi_init2.ps1`, into `runs/allen_cahn/from_jaxpi_init/seedN/`);
