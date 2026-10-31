@@ -19,10 +19,17 @@ detail, and what this reimplementation does instead. Sources:
 
   We consulted it only to settle the design decisions below that neither the papers nor JC answer. No jaxpi code is copied here, and the rest of this implementation follows the papers.
 
+  JL at `main` behaves like jaxpi 1.0.0 (`9a373573`, 2023-08-06), the release ten days before EG v1. The later commits to these files change only imports (for jax 0.7), a DeepONet attribute, the `layer_size` rename, the logged timing and the checkpoint path (checked 2026-10-29).
+- **JW**: the paper's own training runs, logged in the public Weights & Biases project `jaxpi/allen_cahn` (linked from jaxpi's `examples/allen_cahn/README.md`). Read through W&B's public API on 2026-10-30.
+  - There is one run per Table 2 row, all from 2023-04-14: `default` `hou3st9d`, `no_fourier_feature` `umk3wzl2`, `no_rwf` `uhz7rim9`, `no_grad_norm` `ed659sjw`, `no_causal` `7gcu4nbz`, `plain` `a7jg5doz`. There is also `default_ntk` `t4lmeorq`, the same run with NTK weighting.
+  - Each run logs, every 100 steps: the relative L2 error, `ics_loss`, `res_loss`, both loss weights, and the minimum causal weight. Their final errors are the Table 2 values, except `no_fourier_feature`, which logs 4.035e-1 against the table's 4.35e-1.
+  - The configs were not logged. The runs predate jaxpi 1.0.0, so they used pre-release code (`JAX-PI/examples/allen_cahn/main.py`). Each ran on one NVIDIA RTX A6000 (W&B system metrics show a single device per process).
+
 Status key:
 - **stated**: the paper says it. It is recorded here only because a different section of the paper says something else.
 - **from JC**: the paper does not say it, and the value comes from the jaxpi configs.
 - **from JL**: the paper and configs do not say it, and the design decision comes from jaxpi's code.
+- **from JW**: the paper's logged runs show it.
 - **provisional**: no source says it, so this is our own choice.
 - **open**: not decided yet.
 
@@ -136,11 +143,13 @@ decision means editing YAML, not code.
   - The step-0 update is taken at that jump, so λ̂_ic ≈ 1.6e3 (paper's sum) or ≈ 8e2 (mean, D20). With the mean, λ_ic = 82.5 from step 1.
   - Updating before the step, as we did earlier, gives λ_ic ≈ 1.0. With that choice λ_ic only reaches its later level after tens of thousands of steps.
   - So the timing mostly affects the first ~20,000 steps of the 200,000.
+- **Confirmed by JW:** the paper's `default` run logs L_ic = 10.0 and L_r = 4.0e3 at step 0, the same jump, and λ_ic = 49.2, λ_r = 0.950 after the step-0 update. Ours on CUDA: λ_ic = 56–81 over seeds 0–4, and λ_r = 0.950.
 
-### D14. Typo in the plain-PINN row of Table 2: provisional
+### D14. Typo in the plain-PINN row of Table 2: from JW
 - **Question:** EG Table 2 prints the plain row as "51.74 × 10^−1", which would be greater than 1 and does not fit the paper's text.
 - **Decision:** Read it as 5.174 × 10^−1.
 - **Reason:** This is close to the 4.98 × 10^−1 that PN Table 2 gives for the original PINN formulation, and to the no-Fourier row (4.35 × 10^−1).
+- **Confirmed:** the paper's `plain` run (JW) ends at 0.5174. jaxpi's authors also called it a typo (jaxpi issue #6, 2024-04-09).
 
 ### D15. Causal weights: stated
 - **Decision:**
@@ -161,11 +170,18 @@ decision means editing YAML, not code.
 - **Decision:** ‖u_θ − u_ref‖₂ / ‖u_ref‖₂ over the full reference grid. JL computes the error the same way.
 - **Our grid:** 201 × 512 points (t = 0, 0.005, …, 1; x_j = −1 + 2j/512). The reference solution is ETDRK4 Fourier pseudo-spectral and self-converged to about 1e-6 (`data/generate_allen_cahn.py`).
 - **Paper's grid:** PN Appendix B uses a 200 × 512 Chebfun/ETDRK4 dataset.
+- **Cross-check against jaxpi's data (2026-10-29):** jaxpi evaluates against `examples/allen_cahn/data/allen_cahn.mat`, made by Chebfun's `spin` with 511 Fourier modes and dt = 1e-5. It is stored on t = 0, 0.005, …, 1 and x = linspace(−1, 1, 512), with x = 1 repeating x = −1.
+  - Our N = 4096 solution, evaluated by its Fourier series on that grid, differs from it by 1.5e-5 relative L2, 40× below the paper's best ablation error (5.84e-4). The difference sits at t ≤ 0.5, near the kink of u0 at x = ±1 (max abs 8.9e-4).
+  - Our solver run at their settings (511 modes, dt = 1e-5) reproduces their file to 4e-14.
+  - So the two references agree, and the reference cannot explain a gap at the 1e-3 level. The data file was downloaded for this check only and is not in the repository.
 
 ### D18. Seeds: provisional
 - **Question:** How many seeds per row, and which?
 - **Decision:** Seed 0, one run per row. The model initialization uses torch's global RNG seeded with `training.seed`. The collocation sampler has its own generator, seeded with `training.seed + 1`.
 - **Source:** JC uses `seed = 42`, but JAX's PRNG and PyTorch's differ, so using the same number would not reproduce their initialization. EG does not say whether Table 2 averages over seeds, while PN's ablations average 5. We will add seeds if single runs turn out too noisy to compare with the paper.
+- **Update (2026-10-29):** seed 0 was too noisy for `no_grad_norm`: it gave 7.3e-4, while seeds 1 and 2 gave 5.6e-3 and 5.7e-3. Seeds 1 and 2 of every row are kept in separate output roots (`runs/allen_cahn/ablation_seed1/`, `ablation_seed2/`); see `handoff.md`.
+- **The paper's runs (JW)** share one seed. `default`, `no_grad_norm` and `default_ntk` take the same first step (all weights are 1, and the network and causal weighting are the same), and all three log identical values after it: rel. L2 3.682752, L_ic 10.016, L_r 3978.6. So they started from the same network on the same batch, as our rows do for a given seed. Their agreement with each other is therefore not independent evidence.
+- **Seed 0 on CPU vs CUDA:** the sampler's `torch.Generator` lives on the training device, and CPU and CUDA generators produce different streams. So seed 0 on the GPU draws different collocation points from seed 0 on CPU, and λ_ic after the step-0 update is 73.9 on CUDA vs 82.5 on CPU (D13). Given the same batch, the two devices agree.
 
 ### D20. Normalization in the grad-norm weights: from JL (owner's decision)
 - **The difference:**
@@ -180,6 +196,51 @@ decision means editing YAML, not code.
   - After the step-0 update (D13), with seed 0 on CPU: mean gives λ_ic = 82.5 and λ_r = 0.95, a ratio of 87. Sum gives λ_ic = 164 and λ_r = 1.0, a ratio of 164.
   - Adam is nearly invariant to a common scale on the loss, so only this ratio matters.
   - Later in training the two versions agree.
+- **Confirmed by JW:** the paper's runs used the mean. Their λ_r falls from 0.95 to 0.51 and stays there. In `default`, ours stays within 0.008 of theirs at all 2,000 logged steps for four of our five seeds, and within 0.03 for the fifth. With the sum, λ̂_r = 1 + ‖∇L_ic‖/‖∇L_r‖ > 1, so λ_r could not fall below 1.
+
+### D21. What RWF trains, s or exp(s): from JL (by the D20 rule)
+- **The difference:**
+  - EG Algorithm 2 writes W = diag(exp(s)) V and trains s. Our runs before 2026-10-30 did the same.
+  - JL applies exp once, at initialization, and then trains the scale g = exp(s) directly, with W = diag(g) V.
+  - The network function is the same, but the gradients differ: dL/dg = (dL/ds) / g.
+  - With Adam, each step moves the trained parameter by about lr. Training s, g changes by a factor of about 1 ± lr. Training g, it changes by a factor of about 1 ± lr/g. With g ≈ 1.65, the scales therefore move about 1.65× faster when s is trained.
+- **Measured effect on the grad-norm weights:** none to speak of. At the final checkpoints of `default` (seeds 0–2) and `no_causal`, the s-parameters carry about 0.1% of the squared gradient norm, and λ̂_ic agrees to within 0.1% under both parametrizations.
+- **Switch:** `model.rwf.scale_param`: `direct` trains g (JL, the default since 2026-10-30), and `log` trains s (EG Algorithm 2). Both draw the same random numbers, so a given seed starts from the same network and sees the same batches, and each `direct` run pairs with the `log` run of the same seed and row.
+- **Test (2026-10-30), `runs\rwf_direct_chain.cmd`, `rwf_direct_chain2.cmd` and `rwf_direct_chain3.cmd`:** final rel. L2, `log` → `direct`:
+
+  | Row | Seed | `log` | `direct` | `direct` / `log` |
+  |---|--:|--:|--:|--:|
+  | default | 0 | 3.39e-3 | 2.93e-3 | 0.87 |
+  | default | 1 | 2.88e-3 | 2.27e-3 | 0.79 |
+  | default | 2 | 2.56e-3 | 2.27e-3 | 0.89 |
+  | default | 3 | 5.03e-3 | 3.67e-3 | 0.73 |
+  | default | 4 | 4.17e-3 | 4.81e-3 | 1.15 |
+  | no_causal | 0 | 8.63e-3 | 5.61e-3 | 0.65 |
+  | no_causal | 1 | 2.66e-3 | 4.95e-3 | 1.86 |
+  | no_causal | 2 | 4.89e-3 | 5.16e-3 | 1.05 |
+  | no_grad_norm | 0 | 7.28e-4 | 2.86e-3 | 3.92 |
+  | no_grad_norm | 1 | 5.65e-3 | 6.41e-3 | 1.14 |
+  | no_grad_norm | 2 | 5.70e-3 | 6.14e-3 | 1.08 |
+  | no_fourier | 0 | 5.33e-2 | 5.12e-1 | 9.61 |
+  | no_fourier | 1 | 5.09e-1 | 5.06e-1 | 0.99 |
+  | no_fourier | 2 | 4.08e-1 | 4.24e-1 | 1.04 |
+
+  - **No consistent effect.** `direct` ends lower in 4 of 5 `default` pairs (geometric mean of the ratios 0.87; median 3.39 → 2.93e-3), but higher in 7 of 9 other pairs. Over all 14 pairs it is lower in 6, with a geometric mean of 1.28, or 0.98 without the two outliers below. With no effect at all, 4 or more of 5 `default` pairs would still improve 19% of the time.
+  - **How the pairs diverge:** every pair is within 8% at 10k steps. After that, when a run leaves its early plateau (rel. L2 ≈ 0.5, somewhere between 20k and 50k steps) can move by up to 10k steps in either direction (`default` seed 3, `no_causal` seed 2, `no_grad_norm` seeds 0–1). From then on, the two runs of a pair differ about as much as runs with different seeds. In `no_fourier`, seed 0's regular run leaves the plateau between 40k and 80k steps, and its `direct` twin never does.
+  - **Lucky runs do not survive the switch.** Our two outliers both end like the other seeds of their row under `direct`, from the same network and batches:
+    - `no_grad_norm` seed 0: 7.3e-4, 10× better than the paper and 8× better than our seeds 1–2, becomes 2.9e-3;
+    - `no_fourier` seed 0: 5.3e-2, against 0.41–0.51 for seeds 1–2 and the paper, becomes 0.51.
+  - `direct` does not explain the gap to the paper: `default` with `direct` still ends 3.9–8.2× above it, against 4.4–8.6× with `log`.
+  - `runs/allen_cahn/rwf_direct_seed{0,1,2}/` now holds every RWF row of seeds 0–2 under `direct`. `no_rwf` and `plain` have no RWF and are unaffected. The row ordering by median is the same under both.
+- **Decision (2026-10-30):** `direct`, by the D20 rule. The owner left the call to us.
+  - The 14 pairs show no consistent effect on the error, so nothing argues against the rule.
+  - JW cannot settle it. The paper's runs used pre-release code, and the logs do not show the parametrization.
+  - Seeds 0–2 of every RWF row already exist under `direct` (above), so the switch needed no new runs.
+- **Older runs:** configs saved before the key existed (every regular run except seed 2's `no_fourier` and `plain`) have no `scale_param`. They trained s, so a saved config without the key is read as `log` (`saved_config_from_dict` in `piratenets/config.py`), not as the new default.
+  - Resuming such a checkpoint therefore needs `--set model.rwf.scale_param=log`.
+  - `scripts/run_ablation.py` stops, instead of skipping, when an output folder holds a finished run with other settings. So `runs/allen_cahn/ablation*/` now stop it for every RWF row unless it is given `model.rwf.scale_param=log`.
+  - Settings of a disabled RWF are ignored in both checks, so the `no_rwf` and `plain` runs count under either value.
+- **Source:** EG Sec. 4.3 and Algorithm 2; JL `jaxpi/archs.py` (the weight-factorization initializer and `Dense`), read 2026-10-29.
 
 ## Best Allen–Cahn run (EG Table 6), for later
 
