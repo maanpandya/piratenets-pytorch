@@ -126,17 +126,26 @@ jaxpi's Allen–Cahn README links a public Weights & Biases project, `jaxpi/alle
     The row ordering is the same under both, though under `direct` `no_fourier` ends within 0.4% of `plain` (5.08e-1).
 - **λ_ic climbs late in every `default` seed,** to 51–113 at 200k, where the paper's stays at 25. L_ic falls to 1e-10–2e-9. By then the learning rate is below 1e-6, so this barely moves the parameters.
 
+## jaxpi itself (2026-10-31)
+jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source JR in `docs/decisions.md`). This separates "the paper's seed was favorable" from "our implementation differs somewhere the logs don't show".
+
+| jaxpi run | rel. L2 at 10k / 40k / 100k | Final rel. L2 | rel. L2 / √L_r |
+|---|---|--:|--:|
+| paper (W&B) | 0.37 / 7.6e-3 / 9.9e-4 | 5.84e-4 | 1.5 |
+| seed 42, full precision | 0.38 / 7.7e-3 / 9.4e-4 | 5.52e-4 | 2.4 |
+| ours, `default`, 10 runs | 0.47–0.59 / 1.4–2.1e-2 / 3.6–6.6e-3 | 2.3–5.0e-3 | 7.2–12.5 |
+
+- **The paper used seed 42**, and jaxpi reproduces the paper from it. With JAX's pre-0.5 random streams, jaxpi's seed 42 logs the paper's first step, so it starts from the same network (D18). It ends at 5.52e-4, and its error stays within about 10% of the paper's run the whole way, although its losses drift up to 2× from the paper's.
+- **λ_ic climbs late in jaxpi too** (43 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
+- **Running:** seeds 0–3 at full precision, then seed 42 at JAX's default precision (TF32 on this GPU). The chain (`~/jaxpi-runs/chain.sh` in Ubuntu) takes about 50 min per run. It skips finished runs, and an interrupted run starts over.
+- **Setup:**
+  - jaxpi `main` (`f944a0c`) is cloned at `~/jaxpi` in WSL2 Ubuntu, with a virtualenv at `~/jaxpi-venv`. It has jax 0.6.2 (the newest for Python 3.10), CPU-only torch (jaxpi's sampler imports it) and `tabulate`.
+  - Our wrapper `~/jaxpi-runs/run_ac.py` replaces W&B with a JSON-lines log (`~/jaxpi-runs/*.jsonl`). Its options: `--seed`, `--precision highest|default`, and `--rng legacy`, the old random streams that reproduce the paper's initialization.
+  - Launch from Windows with `Start-Process wsl.exe -ArgumentList "-d","Ubuntu","--exec","bash","/home/maan/jaxpi-runs/chain.sh" -WindowStyle Minimized`.
+- **License** (read 2026-10-30): jaxpi may be used, copied and modified for non-profit research only, and not distributed to third parties without Penn's approval. Publications should acknowledge it. Keep its code, and the wrapper, out of this repository, and never imitate its code here.
+
 ## Next steps
-- **Run jaxpi itself with a few seeds** of its `default` config. This is the one test that separates "the paper's seed was favorable" from "our implementation differs somewhere the logs don't show".
-  - If jaxpi's seeds spread like ours (2–5e-3), the paper's single run was a good seed, and we already match the method.
-  - If they cluster near 6e-4, something in our implementation differs.
-  - **License** (read 2026-10-30): jaxpi may be used, copied and modified for non-profit research only, and not distributed to third parties without Penn's approval. Publications should acknowledge it. Running it locally for this comparison fits; keep its code out of this repository.
-  - **Prepared:** WSL2 Ubuntu (Python 3.10) sees the GPU, and jaxpi `main` (`f944a0c`, 2025-09-11) is cloned at `~/jaxpi` in Ubuntu, with its own `allen_cahn.mat`. Nothing is installed or run yet. Claude Code's auto mode blocked installing and running third-party code, so this needs the owner's permission.
-  - **Setup:** Ubuntu lacks `python3-venv`, so use `pip3 install --user virtualenv`, then a virtualenv with `jax[cuda12]` and `pip install -e ~/jaxpi`. jaxpi's `train.py` logs only through `wandb.init` and `wandb.log`, so a small wrapper outside the repo can replace both with a CSV writer.
-  - **Plan:**
-    - Seed 42 first, the seed in jaxpi's `default` config. If its step-0 log matches the paper's run (rel. L2 3.682752, L_ic 10.016, L_r 3978.6; D18), the paper used it too, and the two trajectories can be compared directly.
-    - Then seeds 0–3.
-    - jaxpi `main` pins matmul precision to `"highest"`, as we do. A run with JAX's default precision would test the TF32 question without touching our experiment.
+- **Finish the jaxpi comparison** (above). If jaxpi's other seeds land near 6e-4, our implementation differs from jaxpi somewhere; if they spread like ours, the paper's seed was favorable.
 - **Comparing with the paper's runs:** the W&B histories can be read without an account through `https://api.wandb.ai/graphql` (project `jaxpi/allen_cahn`; run ids in `docs/decisions.md`, JW). They log the error, both losses, both weights and the minimum causal weight every 100 steps. Prefer them over values read off EG Fig. 4.
 - **When a run looks off,** check `training.png`:
   - the minimum causal weight should reach 1 by about 30k steps, as in the paper's runs;

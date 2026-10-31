@@ -24,6 +24,10 @@ detail, and what this reimplementation does instead. Sources:
   - There is one run per Table 2 row, all from 2023-04-14: `default` `hou3st9d`, `no_fourier_feature` `umk3wzl2`, `no_rwf` `uhz7rim9`, `no_grad_norm` `ed659sjw`, `no_causal` `7gcu4nbz`, `plain` `a7jg5doz`. There is also `default_ntk` `t4lmeorq`, the same run with NTK weighting.
   - Each run logs, every 100 steps: the relative L2 error, `ics_loss`, `res_loss`, both loss weights, and the minimum causal weight. Their final errors are the Table 2 values, except `no_fourier_feature`, which logs 4.035e-1 against the table's 4.35e-1.
   - The configs were not logged. The runs predate jaxpi 1.0.0, so they used pre-release code (`JAX-PI/examples/allen_cahn/main.py`). Each ran on one NVIDIA RTX A6000 (W&B system metrics show a single device per process).
+- **JR**: jaxpi itself, run on this laptop from 2026-10-31.
+  - It runs unmodified at `main` (`f944a0c`) in WSL2 Ubuntu, with jax 0.6.2 (the newest for Ubuntu's Python 3.10).
+  - A small wrapper of ours, `~/jaxpi-runs/run_ac.py` in Ubuntu, replaces W&B with a JSON-lines log and sets the seed and the matmul precision. It is kept out of this repository, as is all of jaxpi; only the numbers it logs are used here.
+  - jaxpi's license allows use and modification for non-profit research, but no distribution. Nothing here imitates its code.
 
 Status key:
 - **stated**: the paper says it. It is recorded here only because a different section of the paper says something else.
@@ -181,6 +185,9 @@ decision means editing YAML, not code.
 - **Source:** JC uses `seed = 42`, but JAX's PRNG and PyTorch's differ, so using the same number would not reproduce their initialization. EG does not say whether Table 2 averages over seeds, while PN's ablations average 5. We will add seeds if single runs turn out too noisy to compare with the paper.
 - **Update (2026-10-29):** seed 0 was too noisy for `no_grad_norm`: it gave 7.3e-4, while seeds 1 and 2 gave 5.6e-3 and 5.7e-3. Seeds 1 and 2 of every row are kept in separate output roots (`runs/allen_cahn/ablation_seed1/`, `ablation_seed2/`); see `handoff.md`.
 - **The paper's runs (JW)** share one seed. `default`, `no_grad_norm` and `default_ntk` take the same first step (all weights are 1, and the network and causal weighting are the same), and all three log identical values after it: rel. L2 3.682752, L_ic 10.016, L_r 3978.6. So they started from the same network on the same batch, as our rows do for a given seed. Their agreement with each other is therefore not independent evidence.
+- **That seed is 42 (JR).** jaxpi at `main` with `seed = 42` logs the same first step: rel. L2 3.682462, L_ic 10.0159, L_r 3978.0, λ_ic 49.25, λ_r 0.950. It needs `jax_threefry_partitionable = False`, the random streams JAX used before 0.5. With the newer streams the same seed gives a different network (rel. L2 4.36).
+  - So the pre-release code built the same network and drew the same first batch as jaxpi 1.0.0.
+  - The run then tracks the paper's for 1,000–2,000 steps: rel. L2 and L_r within 0.25%, and L_ic (near 4e-5 by then) within 2.5%. After that, round-off sends the two apart. That holds at both matmul precisions, so this does not show which precision the paper used.
 - **Seed 0 on CPU vs CUDA:** the sampler's `torch.Generator` lives on the training device, and CPU and CUDA generators produce different streams. So seed 0 on the GPU draws different collocation points from seed 0 on CPU, and λ_ic after the step-0 update is 73.9 on CUDA vs 82.5 on CPU (D13). Given the same batch, the two devices agree.
 
 ### D20. Normalization in the grad-norm weights: from JL (owner's decision)
