@@ -133,11 +133,18 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
 |---|---|--:|--:|
 | paper (W&B) | 0.37 / 7.6e-3 / 9.9e-4 | 5.84e-4 | 1.5 |
 | seed 42, full precision | 0.38 / 7.7e-3 / 9.4e-4 | 5.52e-4 | 2.4 |
+| seed 0, full precision | 0.54 / 1.1e-2 / 2.5e-3 | 1.51e-3 | 5.6 |
+| seed 1, full precision | 0.55 / 1.1e-2 / 2.4e-3 | 1.39e-3 | 4.3 |
 | ours, `default`, 10 runs | 0.47–0.59 / 1.4–2.1e-2 / 3.6–6.6e-3 | 2.3–5.0e-3 | 7.2–12.5 |
 
 - **The paper used seed 42**, and jaxpi reproduces the paper from it. With JAX's pre-0.5 random streams, jaxpi's seed 42 logs the paper's first step, so it starts from the same network (D18). It ends at 5.52e-4, and its error stays within about 10% of the paper's run the whole way, although its losses drift up to 2× from the paper's.
-- **λ_ic climbs late in jaxpi too** (43 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
-- **Running:** seeds 0–3 at full precision, then seed 42 at JAX's default precision (TF32 on this GPU). The chain (`~/jaxpi-runs/chain.sh` in Ubuntu) takes about 50 min per run. It skips finished runs, and an interrupted run starts over.
+- **Seed 42 was favorable.** jaxpi's seeds 0 and 1 end 2.5–2.7× above it. At 10k steps they are at 0.54–0.55, inside our range.
+- **Ours are still about 2× worse than jaxpi's other seeds:** our best of ten (2.27e-3) is above both. So the gap to the paper looks like two parts: about 2.6× from the paper's favorable seed, and about 2× from something in our training.
+- **Not the initialization:** jaxpi's initial weights and ours have the same statistics, per layer: Glorot spread, the truncation at 2σ, log g ≈ N(0.5, 0.1²), and B ~ N(0, 1).
+- **λ_ic climbs late in jaxpi too** (36–67 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
+- **Running:** seed 42 at JAX's default precision (TF32 on this GPU). Then our trainer from jaxpi's exact initial networks for seeds 42 and 0 (`runs\from_jaxpi_init.ps1`), and then jaxpi seeds 2–3.
+  - Our model reproduces jaxpi's initial predictions to 7.6e-7 from the loaded arrays.
+  - If our trainer then matches jaxpi's results from those networks, the 2× comes from chance in our seeds. If not, our training loop differs. The chain (`~/jaxpi-runs/chain.sh` in Ubuntu) takes about 50 min per run. It skips finished runs, and an interrupted run starts over.
 - **Setup:**
   - jaxpi `main` (`f944a0c`) is cloned at `~/jaxpi` in WSL2 Ubuntu, with a virtualenv at `~/jaxpi-venv`. It has jax 0.6.2 (the newest for Python 3.10), CPU-only torch (jaxpi's sampler imports it) and `tabulate`.
   - Our wrapper `~/jaxpi-runs/run_ac.py` replaces W&B with a JSON-lines log (`~/jaxpi-runs/*.jsonl`). Its options: `--seed`, `--precision highest|default`, and `--rng legacy`, the old random streams that reproduce the paper's initialization.
