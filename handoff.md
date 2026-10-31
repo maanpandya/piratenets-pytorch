@@ -104,10 +104,9 @@ jaxpi's Allen–Cahn README links a public Weights & Biases project, `jaxpi/alle
   - IC over-weighting as such. At equal residual loss (L_r ≈ 6e-7), `default` has about half the error of `no_grad_norm`.
   - The reference solution and metric. jaxpi's own reference data (Chebfun) and ours agree to 1.5e-5 relative L2 (D17).
   - Changes in jaxpi since 1.0.0. Its library and Allen–Cahn example have changed only cosmetically since 2023-08-06 (`docs/decisions.md`, Sources). The paper's runs predate 1.0.0, though, so differences in their pre-release code cannot be ruled out.
-- **Not tested: matmul precision.**
+- **Matmul precision: not the cause** (tested with jaxpi itself, below).
   - jaxpi has pinned JAX's float32 matmul precision to `"highest"` only since 2024-11 (`df13b96a`). That came after a report of hardware-dependent results (jaxpi issue #22), so the paper's runs used JAX's default.
-  - Whether that meant TF32 on the A6000 is not verified. It is an unlikely cause, since the same setup reached 5.8e-5 (`sota`, 2023-07), below the ~1e-3 a TF32 floor would allow.
-  - Testing it would break rule 1 of `windows_run_guide.md`.
+  - jaxpi's seed 42 at JAX's default precision (TF32 on this GPU) ends at 7.31e-4, against 5.52e-4 at full precision. Our own runs keep TF32 off (rule 1 of `windows_run_guide.md`).
 - **D21 test (`runs\rwf_direct_chain.cmd` and `runs\rwf_direct_chain2.cmd`, `model.rwf.scale_param=direct`, into `runs/allen_cahn/rwf_direct_seed*/`):**
   - Each pair starts from the same network and sees the same batches. The 11 pairs of `default`, `no_causal` and `no_grad_norm` are within 7% at 10k steps, then drift apart about as far as different seeds do.
   - `default`, seeds 0–4: `direct` is lower in 4 of 5 (ratios 0.73–0.89, and 1.15 for seed 4). Median 3.39 → 2.93e-3, still 5.0× the paper.
@@ -135,6 +134,7 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
 | seed 42, full precision | 0.38 / 7.7e-3 / 9.4e-4 | 5.52e-4 | 2.4 |
 | seed 0, full precision | 0.54 / 1.1e-2 / 2.5e-3 | 1.51e-3 | 5.6 |
 | seed 1, full precision | 0.55 / 1.1e-2 / 2.4e-3 | 1.39e-3 | 4.3 |
+| seed 42, JAX default precision (TF32) | 0.37 / 7.2e-3 / 9.6e-4 | 7.31e-4 | 1.8 |
 | ours, `default`, 10 runs | 0.47–0.59 / 1.4–2.1e-2 / 3.6–6.6e-3 | 2.3–5.0e-3 | 7.2–12.5 |
 
 - **The paper used seed 42**, and jaxpi reproduces the paper from it. With JAX's pre-0.5 random streams, jaxpi's seed 42 logs the paper's first step, so it starts from the same network (D18). It ends at 5.52e-4, and its error stays within about 10% of the paper's run the whole way, although its losses drift up to 2× from the paper's.
@@ -148,7 +148,8 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
   - jaxpi's optimizer is plain Adam with the same exponential decay as ours, with no warmup, clipping or gradient accumulation.
   - The one remaining difference is the initial-condition grid. jaxpi uses its data's `linspace(-1, 1, 512)`, which holds x = ±1 twice; ours uses 512 periodic points on [-1, 1). The step test used jaxpi's grid.
 - **λ_ic climbs late in jaxpi too** (36–67 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
-- **Running:** seed 42 at JAX's default precision (TF32 on this GPU). Then our trainer from jaxpi's exact initial networks for seeds 42 and 0 (`runs\from_jaxpi_init.ps1`), and then jaxpi seeds 2–3.
+- **TF32 is not the cause.** At JAX's default precision, seed 42 follows the paper's curve as closely as at full precision, and ends 25% higher (7.31e-4). This does not show which precision the paper used.
+- **Running:** our trainer from jaxpi's exact initial networks for seeds 42 and 0 (`runs\from_jaxpi_init.ps1`, into `runs/allen_cahn/from_jaxpi_init/`). The jaxpi chain is paused; re-launching it runs seeds 2–3.
   - Our model reproduces jaxpi's initial predictions to 7.6e-7 from the loaded arrays.
   - If our trainer then matches jaxpi's results from those networks, the 2× comes from chance in our seeds. If not, our training loop differs. The chain (`~/jaxpi-runs/chain.sh` in Ubuntu) takes about 50 min per run. It skips finished runs, and an interrupted run starts over.
 - **Setup:**
