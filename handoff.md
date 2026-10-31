@@ -141,6 +141,12 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
 - **Seed 42 was favorable.** jaxpi's seeds 0 and 1 end 2.5–2.7× above it. At 10k steps they are at 0.54–0.55, inside our range.
 - **Ours are still about 2× worse than jaxpi's other seeds:** our best of ten (2.27e-3) is above both. So the gap to the paper looks like two parts: about 2.6× from the paper's favorable seed, and about 2× from something in our training.
 - **Not the initialization:** jaxpi's initial weights and ours have the same statistics, per layer: Glorot spread, the truncation at 2σ, log g ≈ N(0.5, 0.1²), and B ~ N(0, 1).
+- **Not the training step:** from jaxpi's seed-42 weights and one fixed batch, our `Trainer.train_step` and jaxpi's step agree.
+  - Both losses are identical to 8 digits, and the chunk losses and causal weights agree to 3e-7.
+  - The raw grad-norm weights are identical to 6 digits, and λ_ic after the update is 67.7440 against 67.7431.
+  - After one Adam step, every parameter moves in the same direction, within 1.5e-5 on steps of 1e-3.
+  - jaxpi's optimizer is plain Adam with the same exponential decay as ours, with no warmup, clipping or gradient accumulation.
+  - The one remaining difference is the initial-condition grid. jaxpi uses its data's `linspace(-1, 1, 512)`, which holds x = ±1 twice; ours uses 512 periodic points on [-1, 1). The step test used jaxpi's grid.
 - **λ_ic climbs late in jaxpi too** (36–67 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
 - **Running:** seed 42 at JAX's default precision (TF32 on this GPU). Then our trainer from jaxpi's exact initial networks for seeds 42 and 0 (`runs\from_jaxpi_init.ps1`), and then jaxpi seeds 2–3.
   - Our model reproduces jaxpi's initial predictions to 7.6e-7 from the loaded arrays.
