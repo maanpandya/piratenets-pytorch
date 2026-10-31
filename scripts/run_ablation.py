@@ -1,7 +1,8 @@
 """Run the Allen-Cahn ablation (Expert's Guide Table 2): one run per YAML, in table order.
 
 Finished runs are skipped and interrupted runs resume from their last checkpoint,
-so after a Colab disconnect just run the same command again.
+so after a Colab disconnect just run the same command again. A finished run made
+with different settings stops the script instead of being reported as the row.
 
     python scripts/run_ablation.py --out-root /content/drive/MyDrive/piratenets/ablation
     python scripts/run_ablation.py --only default plain
@@ -13,9 +14,10 @@ import json
 from pathlib import Path
 
 import torch
+import yaml
 
 from piratenets.config import REPO_ROOT, load_config
-from piratenets.trainer import Trainer
+from piratenets.trainer import Trainer, config_mismatch
 
 ROWS = ["default", "no_fourier", "no_rwf", "no_grad_norm", "no_causal", "plain"]
 
@@ -42,6 +44,12 @@ def main():
         cfg = load_config(Path(a.configs_dir) / f"{row}.yaml", a.set)
         cfg.logging.out_dir = str(out_root / cfg.name)
         if is_finished(cfg.out_dir, cfg.training.steps):
+            # A finished run made with other settings must not be reported as this row.
+            saved = cfg.out_dir / "config.yaml"
+            diff = config_mismatch(yaml.safe_load(saved.read_text(encoding="utf-8")), cfg) if saved.exists() else []
+            if diff:
+                raise SystemExit(f"[{cfg.name}] {cfg.out_dir} holds a finished run with a different config "
+                                 f"(in: {diff}); use another --out-root")
             print(f"[{cfg.name}] already finished, skipping", flush=True)
             results[row] = json.loads((cfg.out_dir / "summary.json").read_text(encoding="utf-8"))["rel_l2"]
             continue

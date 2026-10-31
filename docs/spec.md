@@ -2,7 +2,7 @@
 
 What this repository implements. The method follows the two papers, cited as
 **EG** (Expert's Guide, arXiv:2308.08468) and **PN** (PirateNets, arXiv:2402.00326).
-`docs/decisions.md` lists the details the papers leave open (D1–D20) and where each
+`docs/decisions.md` lists the details the papers leave open (D1–D21) and where each
 answer comes from: the papers, jaxpi's example configs, jaxpi's code (consulted for
 design decisions only, nothing copied), or our own choice.
 
@@ -23,7 +23,7 @@ The model maps (t, x) to u, built from these pieces:
 1. **Periodic embedding** (EG Sec. 6.3): v = [t, cos(πx), sin(πx)]. With it, every x-derivative is exactly periodic, so the loss has no boundary term.
 2. **Random Fourier features** (EG Sec. 4.2), optional: γ(v) = [cos(Bv), sin(Bv)], with B ∈ R^{128×3} initialized as B_ij ~ N(0, σ²), σ = 1, and trained with the network (D5).
 3. **MLP** (EG eqs. 4.1–4.2): L hidden layers of width 256 with tanh activations, followed by a linear output layer. Weights start from a Glorot normal truncated at ±2 standard deviations (D8), and biases start at zero.
-4. **Random weight factorization** (EG Sec. 4.3, Algorithm 2), optional, on every dense layer: W = diag(exp(s)) V. It is initialized from the Glorot W with s ~ N(μ, σ²) and V = W / exp(s), and training updates (s, V, b). The ablation uses μ = 0.5, σ = 0.1.
+4. **Random weight factorization** (EG Sec. 4.3, Algorithm 2), optional, on every dense layer: W = diag(exp(s)) V. It is initialized from the Glorot W with s ~ N(μ, σ²) and V = W / exp(s). The ablation uses μ = 0.5, σ = 0.1. By default (`model.rwf.scale_param: direct`), training updates (g, V, b) with g = exp(s), as jaxpi does. With `log`, it updates (s, V, b), as in EG Algorithm 2 (`docs/decisions.md`, D21).
 
 ## Losses (EG eqs. 2.6, 2.8–2.11)
 

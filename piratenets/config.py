@@ -5,6 +5,7 @@ one YAML file. Unknown keys are an error (a typo must not silently fall back to
 a default). Values can be overridden from the command line with dotted keys,
 e.g. ``--set training.steps=500 causal.enabled=false``.
 """
+import copy
 import dataclasses
 import typing
 from dataclasses import dataclass, field
@@ -28,6 +29,7 @@ class RWFConfig:
     enabled: bool = True
     mu: float = 0.5          # scale factors s ~ N(mu, sigma^2), W = diag(exp(s)) V
     sigma: float = 0.1
+    scale_param: str = "direct"  # "direct": train exp(s) itself (jaxpi, D21) | "log": train s (EG Algorithm 2)
 
 
 @dataclass
@@ -162,6 +164,22 @@ def _from_dict(cls, data: dict, prefix: str = ""):
 
 def config_from_dict(data: dict) -> Config:
     return _from_dict(Config, data)
+
+
+# Keys added after runs had been saved, each with the value that reproduces what those
+# runs did. A saved config that lacks one is read with this value, not the current default.
+_LEGACY_VALUES = {("model", "rwf", "scale_param"): "log"}
+
+
+def saved_config_from_dict(data: dict) -> Config:
+    """Read the config of a saved run (checkpoint or config.yaml), possibly an older one."""
+    data = copy.deepcopy(data)
+    for keys, value in _LEGACY_VALUES.items():
+        node = data
+        for key in keys[:-1]:
+            node = node.setdefault(key, {})
+        node.setdefault(keys[-1], value)
+    return config_from_dict(data)
 
 
 def config_to_dict(cfg: Config) -> dict:

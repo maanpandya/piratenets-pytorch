@@ -19,7 +19,7 @@ import numpy as np
 import torch
 
 from . import causal
-from .config import config_to_dict, save_config
+from .config import config_to_dict, save_config, saved_config_from_dict
 from .models import build_model
 from .problems import allen_cahn as ac
 from .weighting import LossWeighting
@@ -33,10 +33,21 @@ CSV_FIELDS = [
 def _resume_relevant(cfg_dict: dict) -> dict:
     """The parts of a config that must match for a resume. Logging, device, name, the
     total step count and the derivative implementation (same values up to round-off)
-    may change, e.g. to extend a run or to move it to another GPU."""
+    may change, e.g. to extend a run or to move it to another GPU. So may the RWF
+    settings when RWF is off, since they then have no effect."""
     d = {k: v for k, v in cfg_dict.items() if k not in ("logging", "device", "name")}
     d["training"] = {k: v for k, v in d["training"].items() if k not in ("steps", "derivatives")}
+    if not d["model"]["rwf"]["enabled"]:
+        d["model"] = {**d["model"], "rwf": {"enabled": False}}
     return d
+
+
+def config_mismatch(saved: dict, cfg) -> list:
+    """Config sections in which a saved run (its config as a dict) differs from cfg in a
+    way that matters for training. Keys the saved config lacks take their legacy value."""
+    a = _resume_relevant(config_to_dict(saved_config_from_dict(saved)))
+    b = _resume_relevant(config_to_dict(cfg))
+    return sorted(k for k in b if a.get(k) != b[k])
 
 
 def set_precision() -> None:
@@ -210,9 +221,8 @@ class Trainer:
         }
 
     def load_state_dict(self, state: dict) -> None:
-        saved, current = _resume_relevant(state["config"]), _resume_relevant(config_to_dict(self.cfg))
-        if saved != current:
-            diff = sorted(k for k in current if saved.get(k) != current[k])
+        diff = config_mismatch(state["config"], self.cfg)
+        if diff:
             raise ValueError(f"checkpoint config differs from the current config in: {diff}")
         self.model.load_state_dict(state["model"])
         self.optimizer.load_state_dict(state["optimizer"])

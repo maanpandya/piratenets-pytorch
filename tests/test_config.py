@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from piratenets.config import REPO_ROOT, config_to_dict, load_config
+from piratenets.config import (
+    REPO_ROOT, Config, config_from_dict, config_to_dict, load_config, saved_config_from_dict,
+)
 
 ABLATION = REPO_ROOT / "configs" / "allen_cahn" / "ablation"
 
@@ -54,9 +56,10 @@ def test_default_row_matches_paper_and_jaxpi_config():
     assert cfg.model.fourier.scale == 1.0 and cfg.model.fourier.embed_dim == 256
     assert cfg.model.rwf.mu == 0.5 and cfg.model.rwf.sigma == 0.1
     assert cfg.causal.num_chunks == 32
-    # design decisions taken from jaxpi's code (D5, D9, D11, D20)
+    # design decisions taken from jaxpi's code (D5, D9, D11, D20, D21)
     assert cfg.model.fourier.trainable is True
     assert cfg.weighting.grad_norm_reduction == "mean"
+    assert cfg.model.rwf.scale_param == "direct"
     assert cfg.optim.staircase is False and cfg.optim.warmup_steps == 0
     assert cfg.training.ic_sampling == "grid"
 
@@ -68,6 +71,15 @@ def test_overrides_and_strict_keys(tmp_path):
         load_config(ABLATION / "default.yaml", ["model.fourier.sclae=3.0"])
     with pytest.raises(TypeError):
         load_config(ABLATION / "default.yaml", ["causal.enabled=maybe"])
+
+
+def test_saved_config_without_scale_param_reads_as_log():
+    # Runs saved before rwf.scale_param existed trained s (D21).
+    data = config_to_dict(Config())
+    del data["model"]["rwf"]["scale_param"]
+    assert config_from_dict(data).model.rwf.scale_param == "direct"
+    assert saved_config_from_dict(data).model.rwf.scale_param == "log"
+    assert "scale_param" not in data["model"]["rwf"]  # the input is left alone
 
 
 def test_paths_resolve_relative_to_repo(tmp_path):

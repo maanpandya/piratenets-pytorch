@@ -6,8 +6,8 @@ import sys
 import pytest
 import torch
 
-from piratenets.config import OptimConfig
-from piratenets.trainer import Trainer, disable_power_throttling, lr_factor
+from piratenets.config import OptimConfig, config_to_dict
+from piratenets.trainer import Trainer, config_mismatch, disable_power_throttling, lr_factor
 
 
 def _rows(path):
@@ -83,3 +83,30 @@ def test_resume_rejects_a_different_config(tiny_cfg):
     tiny_cfg.causal.tol = 2.0
     with pytest.raises(ValueError, match="causal"):
         Trainer(tiny_cfg).train(resume=True)
+
+
+def test_resume_reads_a_checkpoint_without_scale_param_as_log(tiny_cfg):
+    # Checkpoints written before rwf.scale_param existed trained s (D21).
+    tiny_cfg.model.rwf.scale_param = "log"
+    Trainer(tiny_cfg).train(resume=False, max_steps=5)
+    path = tiny_cfg.checkpoint_dir / "last.pt"
+    state = torch.load(path, weights_only=False)
+    del state["config"]["model"]["rwf"]["scale_param"]  # as saved before the key was added
+    torch.save(state, path)
+    tiny_cfg.model.rwf.scale_param = "direct"
+    with pytest.raises(ValueError, match="model"):
+        Trainer(tiny_cfg).train(resume=True)
+    tiny_cfg.model.rwf.scale_param = "log"
+    resumed = Trainer(tiny_cfg)
+    resumed.train(resume=True)
+    assert resumed.step == tiny_cfg.training.steps
+
+
+def test_config_mismatch_ignores_rwf_settings_when_rwf_is_off(tiny_cfg):
+    saved = config_to_dict(tiny_cfg)
+    tiny_cfg.model.rwf.scale_param = "log"
+    assert config_mismatch(saved, tiny_cfg) == ["model"]
+    saved["model"]["rwf"]["enabled"] = tiny_cfg.model.rwf.enabled = False
+    assert config_mismatch(saved, tiny_cfg) == []
+    tiny_cfg.training.steps += 10  # extending a run is allowed
+    assert config_mismatch(saved, tiny_cfg) == []

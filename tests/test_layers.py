@@ -1,3 +1,4 @@
+import pytest
 import torch
 from torch import nn
 
@@ -7,7 +8,7 @@ from piratenets.layers import Dense
 
 def test_rwf_dense_equals_linear_with_recombined_weight():
     torch.manual_seed(0)
-    layer = Dense(7, 5, RWFConfig(enabled=True, mu=1.0, sigma=0.1))
+    layer = Dense(7, 5, RWFConfig(enabled=True, mu=1.0, sigma=0.1, scale_param="log"))
     with torch.no_grad():
         layer.bias.normal_()
     ref = nn.Linear(7, 5)
@@ -22,7 +23,7 @@ def test_rwf_parameters_and_initialization():
     torch.manual_seed(0)
     plain = Dense(64, 32, None)
     torch.manual_seed(0)
-    fact = Dense(64, 32, RWFConfig(enabled=True, mu=1.0, sigma=0.1))
+    fact = Dense(64, 32, RWFConfig(enabled=True, mu=1.0, sigma=0.1, scale_param="log"))
     names = {n for n, _ in fact.named_parameters()}
     assert names == {"s", "v", "bias"}
     assert {n for n, _ in plain.named_parameters()} == {"weight", "bias"}
@@ -31,6 +32,27 @@ def test_rwf_parameters_and_initialization():
     assert fact.s.shape == (32,)  # one scale per output neuron
     assert abs(fact.s.mean().item() - 1.0) < 0.1
     assert torch.all(fact.bias == 0)
+
+
+def test_rwf_direct_scale_same_function_different_gradients():
+    torch.manual_seed(0)
+    log = Dense(64, 32, RWFConfig(enabled=True, mu=0.5, sigma=0.1, scale_param="log"))
+    torch.manual_seed(0)
+    direct = Dense(64, 32, RWFConfig(enabled=True, mu=0.5, sigma=0.1, scale_param="direct"))
+    assert {n for n, _ in direct.named_parameters()} == {"g", "v", "bias"}
+    torch.testing.assert_close(direct.g, torch.exp(log.s), rtol=0, atol=0)
+    torch.testing.assert_close(direct.weight_matrix(), log.weight_matrix(), rtol=0, atol=0)
+    # Same function, but dL/dg = (dL/ds) / g.
+    h = torch.randn(11, 64)
+    log(h).pow(2).sum().backward()
+    direct(h).pow(2).sum().backward()
+    torch.testing.assert_close(direct.g.grad, log.s.grad / direct.g.detach(), rtol=1e-5, atol=1e-7)
+    torch.testing.assert_close(direct.v.grad, log.v.grad, rtol=0, atol=0)
+
+
+def test_rwf_rejects_an_unknown_scale_param():
+    with pytest.raises(ValueError, match="scale_param"):
+        Dense(4, 4, RWFConfig(enabled=True, scale_param="exp"))
 
 
 def test_glorot_truncated_normal():
