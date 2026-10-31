@@ -149,7 +149,13 @@ jaxpi's own Allen–Cahn `default` config, run unmodified on this laptop (source
   - The one remaining difference is the initial-condition grid. jaxpi uses its data's `linspace(-1, 1, 512)`, which holds x = ±1 twice; ours uses 512 periodic points on [-1, 1). The step test used jaxpi's grid.
 - **λ_ic climbs late in jaxpi too** (36–67 at 200k, against the paper's 25), so that climb in our runs is not a difference from jaxpi.
 - **TF32 is not the cause.** At JAX's default precision, seed 42 follows the paper's curve as closely as at full precision, and ends 25% higher (7.31e-4). This does not show which precision the paper used.
-- **Running:** our trainer from jaxpi's exact initial networks for seeds 42 and 0 (`runs\from_jaxpi_init.ps1`, into `runs/allen_cahn/from_jaxpi_init/`). The jaxpi chain is paused; re-launching it runs seeds 2–3.
+- **Our trainer from jaxpi's seed-42 network ends at 3.44e-4**, below both jaxpi's 5.52e-4 and the paper's 5.84e-4, though it draws its own batches. Its error was 0.50 at 10k, 8.7e-3 at 40k and 6.5e-4 at 100k.
+  - So our training loop is not the gap. The starting network largely decides the outcome.
+  - The open question is whether jaxpi's initial networks are better than ours on average, or our seeds were unlucky. Their statistics match: the per-layer weights above, and the spread of the initial output u(t, x).
+- **Running:**
+  - our trainer from jaxpi's initial networks for seeds 0–5 (`runs\from_jaxpi_init.ps1` and `runs\from_jaxpi_init2.ps1`, into `runs/allen_cahn/from_jaxpi_init/seedN/`);
+  - then jaxpi's own seeds 2–3 (the second script re-launches the chain).
+  - The script `from_jaxpi_init.py` and the exported arrays (`init_seedN_legacy.npz`, also in `~/jaxpi-runs`) are in the session scratchpad, outside the repo.
   - Our model reproduces jaxpi's initial predictions to 7.6e-7 from the loaded arrays.
   - If our trainer then matches jaxpi's results from those networks, the 2× comes from chance in our seeds. If not, our training loop differs. The chain (`~/jaxpi-runs/chain.sh` in Ubuntu) takes about 50 min per run. It skips finished runs, and an interrupted run starts over.
 - **Setup:**
